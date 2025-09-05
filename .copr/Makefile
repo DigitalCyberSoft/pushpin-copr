@@ -282,7 +282,6 @@ srpm:
 	echo '%{_bindir}/pushpin-condure'; \
 	echo '%{_bindir}/m2adapter'; \
 	echo '%{_bindir}/pushpin-publish'; \
-	echo '%{_bindir}/pushpin-legacy'; \
 	echo '%dir %{_libdir}/pushpin'; \
 	echo '%{_libdir}/pushpin/*'; \
 	echo '%{_unitdir}/pushpin.service'; \
