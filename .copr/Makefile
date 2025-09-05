@@ -176,7 +176,10 @@ srpm:
 	echo 'export RUST_BACKTRACE=1'; \
 	echo ''; \
 	echo '# Build with release optimizations'; \
-	echo 'make RELEASE=1'; \
+	echo '# Note: Not using RELEASE=1 as it adds --offline which fails in COPR'; \
+	echo '# Building with cargo directly to avoid offline mode'; \
+	echo 'cargo build --release'; \
+	echo 'cd postbuild && make'; \
 	echo ''; \
 	echo '%install'; \
 	echo '# Install binaries'; \
