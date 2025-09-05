@@ -1,0 +1,10 @@
+{
+  "pushpin": {
+    "version": "1.41.0",
+    "release_date": "2024-10-01T17:55:33Z",
+    "download_url": "https://github.com/fastly/pushpin/archive/refs/tags/v1.41.0.tar.gz",
+    "source": "github-releases",
+    "last_checked": "2025-09-06T00:00:00Z"
+  },
+  "last_update": "2025-09-06T00:00:00Z"
+}
