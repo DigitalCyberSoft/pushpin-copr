@@ -173,6 +173,7 @@ srpm:
 	echo 'export LIBDIR=%{_libdir}/pushpin'; \
 	echo 'export CONFIGDIR=%{_sysconfdir}/pushpin'; \
 	echo 'export RUST_BACKTRACE=1'; \
+	echo 'export CARGO_PROFILE_RELEASE_BUILD_OVERRIDE_DEBUG=true'; \
 	echo ''; \
 	echo '# Build Pushpin'; \
 	echo '# Install qmake if not available'; \
