@@ -174,23 +174,14 @@ srpm:
 	echo 'export CONFIGDIR=%{_sysconfdir}/pushpin'; \
 	echo 'export RUST_BACKTRACE=1'; \
 	echo ''; \
-	echo '# Build with release optimizations'; \
-	echo '# Note: Not using make RELEASE=1 as it adds --offline which fails in COPR'; \
+	echo '# Build Pushpin'; \
+	echo '# Fetch cargo dependencies first (needed when building from tarball)'; \
+	echo 'cargo fetch'; \
 	echo ''; \
-	echo '# Install qmake if not available'; \
-	echo 'if ! command -v qmake >/dev/null 2>&1; then'; \
-	echo '    echo "Installing qmake..."'; \
-	echo '    sudo dnf install -y qmake || exit 1'; \
-	echo 'fi'; \
-	echo ''; \
-	echo '# Building with cargo directly to avoid offline mode'; \
+	echo '# Build with release flag but without offline mode'; \
+	echo '# We build components separately to avoid the --offline flag'; \
 	echo 'cargo build --release'; \
-	echo ''; \
-	echo '# Generate postbuild Makefile with qmake'; \
-	echo 'cd postbuild && RELEASE=1 qmake postbuild.pro || exit 1'; \
-	echo ''; \
-	echo '# Build postbuild components'; \
-	echo 'cd postbuild && RELEASE=1 make || exit 1'; \
+	echo 'make postbuild RELEASE=1'; \
 	echo ''; \
 	echo '%install'; \
 	echo '# Install binaries'; \
