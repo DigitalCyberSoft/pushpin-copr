@@ -11,6 +11,24 @@ srpm:
 	@echo "Working directory: $$(pwd)"
 	@echo "User: $$(whoami)"
 
+	# Enable EPEL repository for RHEL-based systems
+	@if [ -f /etc/redhat-release ] || [ -f /etc/centos-release ] || [ -f /etc/almalinux-release ] || [ -f /etc/rocky-release ]; then \
+		if ! rpm -qa | grep -q epel-release; then \
+			echo "=== Enabling EPEL repository for RHEL-based system ==="; \
+			if command -v dnf >/dev/null 2>&1; then \
+				dnf install -y epel-release || \
+				dnf install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-$$(rpm -E %rhel).noarch.rpm || \
+				echo "WARNING: Could not install EPEL, some packages may be missing"; \
+			elif command -v yum >/dev/null 2>&1; then \
+				yum install -y epel-release || \
+				yum install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-$$(rpm -E %rhel).noarch.rpm || \
+				echo "WARNING: Could not install EPEL, some packages may be missing"; \
+			fi; \
+		else \
+			echo "=== EPEL repository already enabled ==="; \
+		fi; \
+	fi
+
 	# Install required tools if not available
 	@if ! command -v git >/dev/null 2>&1; then \
 		echo "=== Git not found, installing it ==="; \
@@ -187,6 +205,7 @@ srpm:
 	echo "BuildRequires:  libzeromq-devel"; \
 	echo "%endif"; \
 	echo "%else"; \
+	echo "# Fedora/RHEL/CentOS/AlmaLinux (EPEL enabled above)"; \
 	echo "BuildRequires:  zeromq-devel"; \
 	echo "%endif"; \
 	echo "%endif"; \
