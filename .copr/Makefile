@@ -145,7 +145,6 @@ srpm:
 	echo "BuildRequires:  openssl-devel"; \
 	echo "BuildRequires:  zeromq-devel"; \
 	echo "BuildRequires:  pcre2-devel"; \
-	echo "BuildRequires:  qmake"; \
 	echo "BuildRequires:  boost-devel"; \
 	echo "BuildRequires:  systemd-rpm-macros"; \
 	echo ''; \
@@ -178,8 +177,11 @@ srpm:
 	echo '# Build with release optimizations'; \
 	echo '# Note: Not using make RELEASE=1 as it adds --offline which fails in COPR'; \
 	echo ''; \
-	echo '# qmake should be available from qmake BuildRequires'; \
-	echo 'which qmake || (echo "ERROR: qmake not found" && exit 1)'; \
+	echo '# Install qmake if not available'; \
+	echo 'if ! command -v qmake >/dev/null 2>&1; then'; \
+	echo '    echo "Installing qmake..."'; \
+	echo '    sudo dnf install -y qmake || exit 1'; \
+	echo 'fi'; \
 	echo ''; \
 	echo '# Building with cargo directly to avoid offline mode'; \
 	echo 'cargo build --release'; \
