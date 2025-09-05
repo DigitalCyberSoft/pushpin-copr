@@ -145,7 +145,7 @@ srpm:
 	echo "BuildRequires:  openssl-devel"; \
 	echo "BuildRequires:  zeromq-devel"; \
 	echo "BuildRequires:  pcre2-devel"; \
-	echo "BuildRequires:  qt5-qtbase-devel"; \
+	echo "BuildRequires:  qmake"; \
 	echo "BuildRequires:  boost-devel"; \
 	echo "BuildRequires:  systemd-rpm-macros"; \
 	echo ''; \
@@ -178,10 +178,8 @@ srpm:
 	echo '# Build with release optimizations'; \
 	echo '# Note: Not using make RELEASE=1 as it adds --offline which fails in COPR'; \
 	echo ''; \
-	echo '# Install qmake if not available (try Qt6 first, then Qt5)'; \
-	echo 'if ! command -v qmake >/dev/null 2>&1; then'; \
-	echo '    dnf install -y qt6-qtbase-devel || dnf install -y qt5-qtbase-devel || exit 1'; \
-	echo 'fi'; \
+	echo '# qmake should be available from qmake BuildRequires'; \
+	echo 'which qmake || (echo "ERROR: qmake not found" && exit 1)'; \
 	echo ''; \
 	echo '# Building with cargo directly to avoid offline mode'; \
 	echo 'cargo build --release'; \
