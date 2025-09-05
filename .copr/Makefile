@@ -42,10 +42,10 @@ srpm:
 		echo "=== qmake not found, installing it ==="; \
 		if command -v dnf >/dev/null 2>&1; then \
 			echo "Using DNF to install qmake..."; \
-			dnf install -y qmake || (echo "ERROR: Failed to install qmake with dnf" && exit 1); \
+			dnf install -y qt6-qtbase-devel || dnf install -y qt5-qtbase-devel || (echo "ERROR: Failed to install qmake with dnf" && exit 1); \
 		elif command -v yum >/dev/null 2>&1; then \
 			echo "Using YUM to install qmake..."; \
-			yum install -y qmake || (echo "ERROR: Failed to install qmake with yum" && exit 1); \
+			yum install -y qt5-qtbase-devel || (echo "ERROR: Failed to install qmake with yum" && exit 1); \
 		else \
 			echo "ERROR: No package manager found to install qmake"; \
 			exit 1; \
@@ -168,6 +168,7 @@ srpm:
 	echo "BuildRequires:  openssl-devel"; \
 	echo "BuildRequires:  zeromq-devel"; \
 	echo "BuildRequires:  pcre2-devel"; \
+	echo "BuildRequires:  qt5-qtbase-devel"; \
 	echo "BuildRequires:  boost-devel"; \
 	echo "BuildRequires:  systemd-rpm-macros"; \
 	echo ''; \
