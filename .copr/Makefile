@@ -38,9 +38,19 @@ srpm:
 			exit 1; \
 		fi; \
 	fi
-	@if ! command -v qmake >/dev/null 2>&1; then \
+	@if ! command -v qmake >/dev/null 2>&1 && ! command -v qmake-qt5 >/dev/null 2>&1; then \
 		echo "=== qmake not found, installing it ==="; \
-		if command -v dnf >/dev/null 2>&1; then \
+		if command -v zypper >/dev/null 2>&1; then \
+			echo "Using zypper to install qmake (openSUSE)..."; \
+			zypper install -y libqt5-qtbase-devel || (echo "ERROR: Failed to install qmake with zypper" && exit 1); \
+		elif command -v urpmi >/dev/null 2>&1; then \
+			echo "Using urpmi to install qmake (Mageia)..."; \
+			if [ "$$(uname -m)" = "x86_64" ] || [ "$$(uname -m)" = "aarch64" ]; then \
+				urpmi --auto lib64qt5core-devel qtbase5-common-devel || (echo "ERROR: Failed to install qmake with urpmi" && exit 1); \
+			else \
+				urpmi --auto libqt5core-devel qtbase5-common-devel || (echo "ERROR: Failed to install qmake with urpmi" && exit 1); \
+			fi; \
+		elif command -v dnf >/dev/null 2>&1; then \
 			echo "Using DNF to install qmake..."; \
 			dnf install -y qt6-qtbase-devel || dnf install -y qt5-qtbase-devel || (echo "ERROR: Failed to install qmake with dnf" && exit 1); \
 		elif command -v yum >/dev/null 2>&1; then \
@@ -166,9 +176,57 @@ srpm:
 	echo "BuildRequires:  cargo"; \
 	echo "BuildRequires:  rust"; \
 	echo "BuildRequires:  openssl-devel"; \
+	echo "# ZeroMQ packages - distribution specific"; \
+	echo "%if 0%{?suse_version}"; \
 	echo "BuildRequires:  zeromq-devel"; \
+	echo "%else"; \
+	echo "%if 0%{?mageia}"; \
+	echo "%ifarch x86_64 aarch64"; \
+	echo "BuildRequires:  lib64zeromq-devel"; \
+	echo "%else"; \
+	echo "BuildRequires:  libzeromq-devel"; \
+	echo "%endif"; \
+	echo "%else"; \
+	echo "BuildRequires:  zeromq-devel"; \
+	echo "%endif"; \
+	echo "%endif"; \
+	echo "# PCRE packages"; \
+	echo "%if 0%{?suse_version}"; \
 	echo "BuildRequires:  pcre2-devel"; \
+	echo "%else"; \
+	echo "%if 0%{?mageia}"; \
+	echo "%ifarch x86_64 aarch64"; \
+	echo "BuildRequires:  lib64pcre2-devel"; \
+	echo "%else"; \
+	echo "BuildRequires:  libpcre2-devel"; \
+	echo "%endif"; \
+	echo "%else"; \
+	echo "BuildRequires:  pcre2-devel"; \
+	echo "%endif"; \
+	echo "%endif"; \
+	echo "# Qt5 development packages - distribution specific"; \
+	echo "%if 0%{?suse_version}"; \
+	echo "# openSUSE/SLES"; \
+	echo "BuildRequires:  libqt5-qtbase-devel"; \
+	echo "BuildRequires:  libQt5Core-devel"; \
+	echo "BuildRequires:  libQt5Network-devel"; \
+	echo "%else"; \
+	echo "%if 0%{?mageia}"; \
+	echo "# Mageia"; \
+	echo "%ifarch x86_64 aarch64"; \
+	echo "BuildRequires:  lib64qt5core-devel"; \
+	echo "BuildRequires:  lib64qt5network-devel"; \
+	echo "BuildRequires:  qtbase5-common-devel"; \
+	echo "%else"; \
+	echo "BuildRequires:  libqt5core-devel"; \
+	echo "BuildRequires:  libqt5network-devel"; \
+	echo "BuildRequires:  qtbase5-common-devel"; \
+	echo "%endif"; \
+	echo "%else"; \
+	echo "# Fedora/RHEL/CentOS/Rocky/Alma"; \
 	echo "BuildRequires:  qt5-qtbase-devel"; \
+	echo "%endif"; \
+	echo "%endif"; \
 	echo "BuildRequires:  boost-devel"; \
 	echo "BuildRequires:  systemd-rpm-macros"; \
 	echo ''; \
