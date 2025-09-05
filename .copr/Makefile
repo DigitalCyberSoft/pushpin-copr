@@ -12,6 +12,14 @@ srpm:
 	@echo "User: $$(whoami)"
 
 	# Install required tools if not available
+	@if ! command -v git >/dev/null 2>&1; then \
+		echo "=== Installing git ==="; \
+		if command -v dnf >/dev/null 2>&1; then \
+			dnf install -y git || yum install -y git || exit 1; \
+		else \
+			yum install -y git || exit 1; \
+		fi; \
+	fi
 	@if ! command -v jq >/dev/null 2>&1; then \
 		echo "=== Installing jq for JSON parsing ==="; \
 		if command -v dnf >/dev/null 2>&1; then \
@@ -60,208 +68,208 @@ srpm:
 	fi; \
 	\
 	echo "=== Creating systemd service file ==="; \
-	cat > pushpin.service <<'EOF'
-[Unit]
-Description=Pushpin realtime reverse proxy
-Documentation=https://pushpin.org/docs/
-After=network.target
-
-[Service]
-Type=simple
-User=pushpin
-Group=pushpin
-WorkingDirectory=/var/lib/pushpin
-ExecStart=/usr/bin/pushpin --merge-output
-ExecReload=/bin/kill -USR1 $$MAINPID
-Restart=on-failure
-RestartSec=5s
-StandardOutput=journal
-StandardError=journal
-SyslogIdentifier=pushpin
-
-# Security hardening
-PrivateTmp=yes
-NoNewPrivileges=yes
-ProtectSystem=strict
-ProtectHome=yes
-ReadWritePaths=/var/lib/pushpin /var/log/pushpin /var/run/pushpin
-
-[Install]
-WantedBy=multi-user.target
-EOF
+	( \
+	echo '[Unit]'; \
+	echo 'Description=Pushpin realtime reverse proxy'; \
+	echo 'Documentation=https://pushpin.org/docs/'; \
+	echo 'After=network.target'; \
+	echo ''; \
+	echo '[Service]'; \
+	echo 'Type=simple'; \
+	echo 'User=pushpin'; \
+	echo 'Group=pushpin'; \
+	echo 'WorkingDirectory=/var/lib/pushpin'; \
+	echo 'ExecStart=/usr/bin/pushpin --merge-output'; \
+	echo 'ExecReload=/bin/kill -USR1 $$MAINPID'; \
+	echo 'Restart=on-failure'; \
+	echo 'RestartSec=5s'; \
+	echo 'StandardOutput=journal'; \
+	echo 'StandardError=journal'; \
+	echo 'SyslogIdentifier=pushpin'; \
+	echo ''; \
+	echo '# Security hardening'; \
+	echo 'PrivateTmp=yes'; \
+	echo 'NoNewPrivileges=yes'; \
+	echo 'ProtectSystem=strict'; \
+	echo 'ProtectHome=yes'; \
+	echo 'ReadWritePaths=/var/lib/pushpin /var/log/pushpin /var/run/pushpin'; \
+	echo ''; \
+	echo '[Install]'; \
+	echo 'WantedBy=multi-user.target'; \
+	) > pushpin.service || exit 1; \
 	echo "Service file created"; \
 	\
 	echo "=== Creating default configuration file ==="; \
-	cat > pushpin.conf <<'EOF'
-# Pushpin configuration file
-# See https://pushpin.org/docs/configuration/ for full documentation
-
-# Global settings
-include internal.conf
-
-# Services to start (comma-separated)
-services=connmgr,proxy,handler
-
-# HTTP port to listen on
-http_port=7999
-
-# Local mode (no external dependencies)
-global_route_pool_size=1
-
-# Default route for all requests (update to your backend)
-# Example: route=* http://localhost:8080
-EOF
+	( \
+	echo '# Pushpin configuration file'; \
+	echo '# See https://pushpin.org/docs/configuration/ for full documentation'; \
+	echo ''; \
+	echo '# Global settings'; \
+	echo 'include internal.conf'; \
+	echo ''; \
+	echo '# Services to start (comma-separated)'; \
+	echo 'services=connmgr,proxy,handler'; \
+	echo ''; \
+	echo '# HTTP port to listen on'; \
+	echo 'http_port=7999'; \
+	echo ''; \
+	echo '# Local mode (no external dependencies)'; \
+	echo 'global_route_pool_size=1'; \
+	echo ''; \
+	echo '# Default route for all requests (update to your backend)'; \
+	echo '# Example: route=* http://localhost:8080'; \
+	) > pushpin.conf || exit 1; \
 	echo "Default configuration created"; \
 	\
 	echo "=== Generating RPM spec file ==="; \
-	cat > pushpin.spec <<EOF
-%global _hardened_build 1
-%global debug_package %{nil}
-
-Name:           pushpin
-Version:        $$VERSION
-Release:        $$RELEASE_NUM%{?dist}
-Summary:        Reverse proxy for realtime web services
-
-License:        Apache-2.0
-URL:            https://pushpin.org/
-Source0:        pushpin-%{version}.tar.gz
-Source1:        pushpin.service
-Source2:        pushpin.conf
-
-BuildRequires:  gcc
-BuildRequires:  gcc-c++
-BuildRequires:  make
-BuildRequires:  cargo
-BuildRequires:  rust
-BuildRequires:  openssl-devel
-BuildRequires:  zeromq-devel
-BuildRequires:  pcre2-devel
-BuildRequires:  qt5-qtbase-devel
-BuildRequires:  boost-devel
-BuildRequires:  systemd-rpm-macros
-
-Requires:       openssl
-Requires:       zeromq
-Requires:       pcre2
-Requires(pre):  shadow-utils
-Requires(post): systemd
-Requires(preun): systemd
-Requires(postun): systemd
-
-%description
-Pushpin is a reverse proxy server written in Rust/C++ that makes it easy to
-implement WebSocket, HTTP streaming, and HTTP long-polling services. The
-project is unique among realtime push solutions in that it is designed to
-be transparent to clients and integrates easily into an API stack.
-
-%prep
-%setup -q -n pushpin-%{version}
-
-%build
-# Set build flags
-export CARGO_HOME=.cargo
-export PREFIX=%{_prefix}
-export BINDIR=%{_bindir}
-export LIBDIR=%{_libdir}/pushpin
-export CONFIGDIR=%{_sysconfdir}/pushpin
-export RUST_BACKTRACE=1
-
-# Build with release optimizations
-make RELEASE=1
-
-%install
-# Install binaries
-install -D -m 755 target/release/pushpin %{buildroot}%{_bindir}/pushpin
-install -D -m 755 target/release/pushpin-proxy %{buildroot}%{_bindir}/pushpin-proxy
-install -D -m 755 target/release/pushpin-handler %{buildroot}%{_bindir}/pushpin-handler
-install -D -m 755 target/release/pushpin-connmgr %{buildroot}%{_bindir}/pushpin-connmgr
-install -D -m 755 target/release/m2adapter %{buildroot}%{_bindir}/m2adapter
-install -D -m 755 target/release/pushpin-publish %{buildroot}%{_bindir}/pushpin-publish
-
-# Install legacy wrapper if it exists
-if [ -f target/release/pushpin-legacy ]; then
-    install -D -m 755 target/release/pushpin-legacy %{buildroot}%{_bindir}/pushpin-legacy
-fi
-
-# Create symlink for condure
-ln -sf pushpin-connmgr %{buildroot}%{_bindir}/pushpin-condure
-
-# Install configuration files
-install -D -m 644 %{SOURCE2} %{buildroot}%{_sysconfdir}/pushpin/pushpin.conf
-install -D -m 644 src/internal.conf %{buildroot}%{_libdir}/pushpin/internal.conf
-
-# Create default routes file
-echo "* localhost:8080" > %{buildroot}%{_sysconfdir}/pushpin/routes
-
-# Install systemd service file
-install -D -m 644 %{SOURCE1} %{buildroot}%{_unitdir}/pushpin.service
-
-# Create required directories
-install -d -m 755 %{buildroot}%{_localstatedir}/lib/pushpin
-install -d -m 755 %{buildroot}%{_localstatedir}/log/pushpin
-install -d -m 755 %{buildroot}%{_localstatedir}/run/pushpin
-install -d -m 755 %{buildroot}%{_sysconfdir}/pushpin/runner
-install -d -m 755 %{buildroot}%{_sysconfdir}/pushpin/runner/certs
-
-# Install runner templates if they exist
-if [ -d src/runner ]; then
-    cp -r src/runner/* %{buildroot}%{_libdir}/pushpin/runner/ 2>/dev/null || true
-fi
-
-%pre
-getent group pushpin >/dev/null || groupadd -r pushpin
-getent passwd pushpin >/dev/null || \
-    useradd -r -g pushpin -d /var/lib/pushpin -s /sbin/nologin \
-    -c "Pushpin realtime proxy" pushpin
-exit 0
-
-%post
-%systemd_post pushpin.service
-if [ \$1 -eq 1 ]; then
-    echo "Pushpin installed. Edit /etc/pushpin/pushpin.conf and /etc/pushpin/routes,"
-    echo "then start with: systemctl start pushpin"
-fi
-
-%preun
-%systemd_preun pushpin.service
-
-%postun
-%systemd_postun_with_restart pushpin.service
-if [ \$1 -eq 0 ]; then
-    # Package removal, not upgrade
-    userdel pushpin >/dev/null 2>&1 || true
-    groupdel pushpin >/dev/null 2>&1 || true
-fi
-
-%files
-%license LICENSE
-%doc README.md CHANGELOG.md
-%{_bindir}/pushpin
-%{_bindir}/pushpin-proxy
-%{_bindir}/pushpin-handler
-%{_bindir}/pushpin-connmgr
-%{_bindir}/pushpin-condure
-%{_bindir}/m2adapter
-%{_bindir}/pushpin-publish
-%{_bindir}/pushpin-legacy
-%dir %{_libdir}/pushpin
-%{_libdir}/pushpin/*
-%{_unitdir}/pushpin.service
-%dir %{_sysconfdir}/pushpin
-%config(noreplace) %{_sysconfdir}/pushpin/pushpin.conf
-%config(noreplace) %{_sysconfdir}/pushpin/routes
-%dir %{_sysconfdir}/pushpin/runner
-%dir %{_sysconfdir}/pushpin/runner/certs
-%attr(0755,pushpin,pushpin) %dir %{_localstatedir}/lib/pushpin
-%attr(0755,pushpin,pushpin) %dir %{_localstatedir}/log/pushpin
-%attr(0755,pushpin,pushpin) %dir %{_localstatedir}/run/pushpin
-
-%changelog
-* $$(date '+%a %b %d %Y') COPR Builder - $$VERSION-$$RELEASE_NUM
-- Automated build from GitHub release v$$VERSION
-- Built from upstream Pushpin project
-EOF
+	( \
+	echo '%global _hardened_build 1'; \
+	echo '%global debug_package %{nil}'; \
+	echo ''; \
+	echo "Name:           pushpin"; \
+	echo "Version:        $$VERSION"; \
+	echo "Release:        $$RELEASE_NUM%{?dist}"; \
+	echo "Summary:        Reverse proxy for realtime web services"; \
+	echo ''; \
+	echo "License:        Apache-2.0"; \
+	echo "URL:            https://pushpin.org/"; \
+	echo "Source0:        pushpin-%{version}.tar.gz"; \
+	echo "Source1:        pushpin.service"; \
+	echo "Source2:        pushpin.conf"; \
+	echo ''; \
+	echo "BuildRequires:  gcc"; \
+	echo "BuildRequires:  gcc-c++"; \
+	echo "BuildRequires:  make"; \
+	echo "BuildRequires:  cargo"; \
+	echo "BuildRequires:  rust"; \
+	echo "BuildRequires:  openssl-devel"; \
+	echo "BuildRequires:  zeromq-devel"; \
+	echo "BuildRequires:  pcre2-devel"; \
+	echo "BuildRequires:  qt5-qtbase-devel"; \
+	echo "BuildRequires:  boost-devel"; \
+	echo "BuildRequires:  systemd-rpm-macros"; \
+	echo ''; \
+	echo "Requires:       openssl"; \
+	echo "Requires:       zeromq"; \
+	echo "Requires:       pcre2"; \
+	echo "Requires(pre):  shadow-utils"; \
+	echo "Requires(post): systemd"; \
+	echo "Requires(preun): systemd"; \
+	echo "Requires(postun): systemd"; \
+	echo ''; \
+	echo '%description'; \
+	echo 'Pushpin is a reverse proxy server written in Rust/C++ that makes it easy to'; \
+	echo 'implement WebSocket, HTTP streaming, and HTTP long-polling services. The'; \
+	echo 'project is unique among realtime push solutions in that it is designed to'; \
+	echo 'be transparent to clients and integrates easily into an API stack.'; \
+	echo ''; \
+	echo '%prep'; \
+	echo '%setup -q -n pushpin-%{version}'; \
+	echo ''; \
+	echo '%build'; \
+	echo '# Set build flags'; \
+	echo 'export CARGO_HOME=.cargo'; \
+	echo 'export PREFIX=%{_prefix}'; \
+	echo 'export BINDIR=%{_bindir}'; \
+	echo 'export LIBDIR=%{_libdir}/pushpin'; \
+	echo 'export CONFIGDIR=%{_sysconfdir}/pushpin'; \
+	echo 'export RUST_BACKTRACE=1'; \
+	echo ''; \
+	echo '# Build with release optimizations'; \
+	echo 'make RELEASE=1'; \
+	echo ''; \
+	echo '%install'; \
+	echo '# Install binaries'; \
+	echo 'install -D -m 755 target/release/pushpin %{buildroot}%{_bindir}/pushpin'; \
+	echo 'install -D -m 755 target/release/pushpin-proxy %{buildroot}%{_bindir}/pushpin-proxy'; \
+	echo 'install -D -m 755 target/release/pushpin-handler %{buildroot}%{_bindir}/pushpin-handler'; \
+	echo 'install -D -m 755 target/release/pushpin-connmgr %{buildroot}%{_bindir}/pushpin-connmgr'; \
+	echo 'install -D -m 755 target/release/m2adapter %{buildroot}%{_bindir}/m2adapter'; \
+	echo 'install -D -m 755 target/release/pushpin-publish %{buildroot}%{_bindir}/pushpin-publish'; \
+	echo ''; \
+	echo '# Install legacy wrapper if it exists'; \
+	echo 'if [ -f target/release/pushpin-legacy ]; then'; \
+	echo '    install -D -m 755 target/release/pushpin-legacy %{buildroot}%{_bindir}/pushpin-legacy'; \
+	echo 'fi'; \
+	echo ''; \
+	echo '# Create symlink for condure'; \
+	echo 'ln -sf pushpin-connmgr %{buildroot}%{_bindir}/pushpin-condure'; \
+	echo ''; \
+	echo '# Install configuration files'; \
+	echo 'install -D -m 644 %{SOURCE2} %{buildroot}%{_sysconfdir}/pushpin/pushpin.conf'; \
+	echo 'install -D -m 644 src/internal.conf %{buildroot}%{_libdir}/pushpin/internal.conf'; \
+	echo ''; \
+	echo '# Create default routes file'; \
+	echo 'echo "* localhost:8080" > %{buildroot}%{_sysconfdir}/pushpin/routes'; \
+	echo ''; \
+	echo '# Install systemd service file'; \
+	echo 'install -D -m 644 %{SOURCE1} %{buildroot}%{_unitdir}/pushpin.service'; \
+	echo ''; \
+	echo '# Create required directories'; \
+	echo 'install -d -m 755 %{buildroot}%{_localstatedir}/lib/pushpin'; \
+	echo 'install -d -m 755 %{buildroot}%{_localstatedir}/log/pushpin'; \
+	echo 'install -d -m 755 %{buildroot}%{_localstatedir}/run/pushpin'; \
+	echo 'install -d -m 755 %{buildroot}%{_sysconfdir}/pushpin/runner'; \
+	echo 'install -d -m 755 %{buildroot}%{_sysconfdir}/pushpin/runner/certs'; \
+	echo ''; \
+	echo '# Install runner templates if they exist'; \
+	echo 'if [ -d src/runner ]; then'; \
+	echo '    cp -r src/runner/* %{buildroot}%{_libdir}/pushpin/runner/ 2>/dev/null || true'; \
+	echo 'fi'; \
+	echo ''; \
+	echo '%pre'; \
+	echo 'getent group pushpin >/dev/null || groupadd -r pushpin'; \
+	echo 'getent passwd pushpin >/dev/null || \'; \
+	echo '    useradd -r -g pushpin -d /var/lib/pushpin -s /sbin/nologin \'; \
+	echo '    -c "Pushpin realtime proxy" pushpin'; \
+	echo 'exit 0'; \
+	echo ''; \
+	echo '%post'; \
+	echo '%systemd_post pushpin.service'; \
+	echo 'if [ $$1 -eq 1 ]; then'; \
+	echo '    echo "Pushpin installed. Edit /etc/pushpin/pushpin.conf and /etc/pushpin/routes,"'; \
+	echo '    echo "then start with: systemctl start pushpin"'; \
+	echo 'fi'; \
+	echo ''; \
+	echo '%preun'; \
+	echo '%systemd_preun pushpin.service'; \
+	echo ''; \
+	echo '%postun'; \
+	echo '%systemd_postun_with_restart pushpin.service'; \
+	echo 'if [ $$1 -eq 0 ]; then'; \
+	echo '    # Package removal, not upgrade'; \
+	echo '    userdel pushpin >/dev/null 2>&1 || true'; \
+	echo '    groupdel pushpin >/dev/null 2>&1 || true'; \
+	echo 'fi'; \
+	echo ''; \
+	echo '%files'; \
+	echo '%license LICENSE'; \
+	echo '%doc README.md CHANGELOG.md'; \
+	echo '%{_bindir}/pushpin'; \
+	echo '%{_bindir}/pushpin-proxy'; \
+	echo '%{_bindir}/pushpin-handler'; \
+	echo '%{_bindir}/pushpin-connmgr'; \
+	echo '%{_bindir}/pushpin-condure'; \
+	echo '%{_bindir}/m2adapter'; \
+	echo '%{_bindir}/pushpin-publish'; \
+	echo '%{_bindir}/pushpin-legacy'; \
+	echo '%dir %{_libdir}/pushpin'; \
+	echo '%{_libdir}/pushpin/*'; \
+	echo '%{_unitdir}/pushpin.service'; \
+	echo '%dir %{_sysconfdir}/pushpin'; \
+	echo '%config(noreplace) %{_sysconfdir}/pushpin/pushpin.conf'; \
+	echo '%config(noreplace) %{_sysconfdir}/pushpin/routes'; \
+	echo '%dir %{_sysconfdir}/pushpin/runner'; \
+	echo '%dir %{_sysconfdir}/pushpin/runner/certs'; \
+	echo '%attr(0755,pushpin,pushpin) %dir %{_localstatedir}/lib/pushpin'; \
+	echo '%attr(0755,pushpin,pushpin) %dir %{_localstatedir}/log/pushpin'; \
+	echo '%attr(0755,pushpin,pushpin) %dir %{_localstatedir}/run/pushpin'; \
+	echo ''; \
+	echo '%changelog'; \
+	echo "* $$(date '+%a %b %d %Y') COPR Builder - $$VERSION-$$RELEASE_NUM"; \
+	echo '- Automated build from GitHub release v%{version}'; \
+	echo '- Built from upstream Pushpin project'; \
+	) > pushpin.spec || exit 1; \
 	echo "Spec file generated"; \
 	\
 	echo "=== Building SRPM ==="; \
