@@ -1,0 +1,48 @@
+[Unit]
+Description=Pushpin realtime reverse proxy
+Documentation=https://pushpin.org/docs/
+After=network.target
+
+[Service]
+Type=simple
+User=pushpin
+Group=pushpin
+WorkingDirectory=/var/lib/pushpin
+
+# Main process
+ExecStart=/usr/bin/pushpin --merge-output
+
+# Reload configuration (attempt USR1, but Pushpin may not support it)
+ExecReload=/bin/kill -USR1 $MAINPID
+
+# Restart policy
+Restart=on-failure
+RestartSec=5s
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=pushpin
+
+# Resource limits
+LimitNOFILE=65535
+
+# Security hardening
+PrivateTmp=yes
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/var/lib/pushpin /var/log/pushpin /var/run/pushpin
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictRealtime=yes
+RestrictNamespaces=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=no
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+SystemCallFilter=@system-service
+SystemCallErrorNumber=EPERM
+
+[Install]
+WantedBy=multi-user.target
