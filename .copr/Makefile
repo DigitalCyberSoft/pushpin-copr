@@ -145,7 +145,6 @@ srpm:
 	echo "BuildRequires:  openssl-devel"; \
 	echo "BuildRequires:  zeromq-devel"; \
 	echo "BuildRequires:  pcre2-devel"; \
-	echo "BuildRequires:  qt5-qtbase-devel"; \
 	echo "BuildRequires:  boost-devel"; \
 	echo "BuildRequires:  systemd-rpm-macros"; \
 	echo ''; \
@@ -176,6 +175,12 @@ srpm:
 	echo 'export RUST_BACKTRACE=1'; \
 	echo ''; \
 	echo '# Build Pushpin'; \
+	echo '# Install qmake if not available'; \
+	echo 'if ! command -v qmake >/dev/null 2>&1; then'; \
+	echo '    echo "Installing qmake..."'; \
+	echo '    sudo dnf install -y qmake || exit 1'; \
+	echo 'fi'; \
+	echo ''; \
 	echo '# Fetch cargo dependencies first (needed when building from tarball)'; \
 	echo 'cargo fetch'; \
 	echo ''; \
