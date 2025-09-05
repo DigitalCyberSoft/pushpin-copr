@@ -145,6 +145,7 @@ srpm:
 	echo "BuildRequires:  openssl-devel"; \
 	echo "BuildRequires:  zeromq-devel"; \
 	echo "BuildRequires:  pcre2-devel"; \
+	echo "BuildRequires:  qt5-qtbase-devel"; \
 	echo "BuildRequires:  boost-devel"; \
 	echo "BuildRequires:  systemd-rpm-macros"; \
 	echo ''; \
