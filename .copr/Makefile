@@ -13,19 +13,42 @@ srpm:
 
 	# Install required tools if not available
 	@if ! command -v git >/dev/null 2>&1; then \
-		echo "=== Installing git ==="; \
+		echo "=== Git not found, installing it ==="; \
 		if command -v dnf >/dev/null 2>&1; then \
-			dnf install -y git || yum install -y git || exit 1; \
+			echo "Using DNF to install git..."; \
+			dnf install -y git || (echo "ERROR: Failed to install git with dnf" && exit 1); \
+		elif command -v yum >/dev/null 2>&1; then \
+			echo "Using YUM to install git..."; \
+			yum install -y git || (echo "ERROR: Failed to install git with yum" && exit 1); \
 		else \
-			yum install -y git || exit 1; \
+			echo "ERROR: No package manager found to install git"; \
+			exit 1; \
 		fi; \
 	fi
 	@if ! command -v jq >/dev/null 2>&1; then \
-		echo "=== Installing jq for JSON parsing ==="; \
+		echo "=== jq not found, installing it ==="; \
 		if command -v dnf >/dev/null 2>&1; then \
-			dnf install -y jq || yum install -y jq || exit 1; \
+			echo "Using DNF to install jq..."; \
+			dnf install -y jq || (echo "ERROR: Failed to install jq with dnf" && exit 1); \
+		elif command -v yum >/dev/null 2>&1; then \
+			echo "Using YUM to install jq..."; \
+			yum install -y jq || (echo "ERROR: Failed to install jq with yum" && exit 1); \
 		else \
-			yum install -y jq || exit 1; \
+			echo "ERROR: No package manager found to install jq"; \
+			exit 1; \
+		fi; \
+	fi
+	@if ! command -v qmake >/dev/null 2>&1; then \
+		echo "=== qmake not found, installing it ==="; \
+		if command -v dnf >/dev/null 2>&1; then \
+			echo "Using DNF to install qmake..."; \
+			dnf install -y qmake || (echo "ERROR: Failed to install qmake with dnf" && exit 1); \
+		elif command -v yum >/dev/null 2>&1; then \
+			echo "Using YUM to install qmake..."; \
+			yum install -y qmake || (echo "ERROR: Failed to install qmake with yum" && exit 1); \
+		else \
+			echo "ERROR: No package manager found to install qmake"; \
+			exit 1; \
 		fi; \
 	fi
 
@@ -176,12 +199,6 @@ srpm:
 	echo 'export CARGO_PROFILE_RELEASE_BUILD_OVERRIDE_DEBUG=true'; \
 	echo ''; \
 	echo '# Build Pushpin'; \
-	echo '# Install qmake if not available'; \
-	echo 'if ! command -v qmake >/dev/null 2>&1; then'; \
-	echo '    echo "Installing qmake..."'; \
-	echo '    sudo dnf install -y qmake || exit 1'; \
-	echo 'fi'; \
-	echo ''; \
 	echo '# Fetch cargo dependencies first (needed when building from tarball)'; \
 	echo 'cargo fetch'; \
 	echo ''; \
