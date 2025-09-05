@@ -177,10 +177,20 @@ srpm:
 	echo ''; \
 	echo '# Build with release optimizations'; \
 	echo '# Note: Not using make RELEASE=1 as it adds --offline which fails in COPR'; \
+	echo ''; \
+	echo '# Install qmake if not available (try Qt6 first, then Qt5)'; \
+	echo 'if ! command -v qmake >/dev/null 2>&1; then'; \
+	echo '    dnf install -y qt6-qtbase-devel || dnf install -y qt5-qtbase-devel || exit 1'; \
+	echo 'fi'; \
+	echo ''; \
 	echo '# Building with cargo directly to avoid offline mode'; \
 	echo 'cargo build --release'; \
-	echo '# Pass RELEASE=1 to postbuild so it looks in target/release/'; \
-	echo 'cd postbuild && make RELEASE=1'; \
+	echo ''; \
+	echo '# Generate postbuild Makefile with qmake'; \
+	echo 'cd postbuild && RELEASE=1 qmake postbuild.pro || exit 1'; \
+	echo ''; \
+	echo '# Build postbuild components'; \
+	echo 'cd postbuild && RELEASE=1 make || exit 1'; \
 	echo ''; \
 	echo '%install'; \
 	echo '# Install binaries'; \
