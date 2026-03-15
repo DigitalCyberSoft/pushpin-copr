@@ -64,3 +64,9 @@ jobs:
         echo ""
         echo "Current versions:"
         cat versions.json
+
+      # Prevent GitHub from disabling this scheduled workflow after 60 days
+      # of repo inactivity
+      - uses: gautamkrishnar/keepalive-workflow@v2
+        with:
+          time_elapsed: 45
