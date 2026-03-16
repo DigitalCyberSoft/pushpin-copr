@@ -16,6 +16,10 @@ on:
       - '.github/workflows/check-versions.yml'
       - 'check_versions.sh'
 
+permissions:
+  contents: write
+  actions: write
+
 jobs:
   check-versions:
     runs-on: ubuntu-latest
