@@ -1,10 +1,10 @@
 {
   "pushpin": {
-    "version": "unknown",
-    "release_date": "2026-06-23T03:36:00Z",
-    "download_url": "https://github.com/fastly/pushpin/archive/refs/tags/vunknown.tar.gz",
+    "version": "1.41.0",
+    "release_date": "2025-08-13T15:52:05Z",
+    "download_url": "https://github.com/fastly/pushpin/archive/refs/tags/v1.41.0.tar.gz",
     "source": "github-releases",
-    "last_checked": "2026-06-23T03:36:00Z"
+    "last_checked": "2026-06-23T14:49:29Z"
   },
-  "last_update": "2026-06-23T03:36:00Z"
+  "last_update": "2026-06-23T14:49:29Z"
 }
