@@ -51,37 +51,28 @@ get_timestamp() {
     date -u +"%Y-%m-%dT%H:%M:%SZ"
 }
 
-# Function to get latest Pushpin release from GitHub
-get_pushpin_version() {
+# Function to get latest Pushpin release from GitHub. Sets RELEASE_VERSION
+# and RELEASE_DATE from one API response; call it directly (not via $()) so
+# the globals survive.
+get_release_info() {
     local api_url="https://api.github.com/repos/fastly/pushpin/releases/latest"
-    local version=""
-    
-    # Try to get version from GitHub API
-    if command -v curl >/dev/null 2>&1; then
-        version=$(curl -s "$api_url" | grep '"tag_name"' | sed 's/.*"v\?\([^"]*\)".*/\1/')
+    local body=""
+    local auth=()
+    if [ -n "${GITHUB_TOKEN:-}" ]; then
+        auth=(-H "Authorization: Bearer ${GITHUB_TOKEN}")
     fi
-    
-    if [ -n "$version" ] && [ "$version" != "null" ]; then
-        # Remove 'v' prefix if present
-        echo "$version" | sed 's/^v//'
-    else
-        echo "unknown"
-    fi
-}
 
-# Function to get Pushpin release date
-get_pushpin_release_date() {
-    local api_url="https://api.github.com/repos/fastly/pushpin/releases/latest"
-    local release_date=""
-    
-    if command -v curl >/dev/null 2>&1; then
-        release_date=$(curl -s "$api_url" | grep '"published_at"' | sed 's/.*"published_at": *"\([^"]*\)".*/\1/')
-    fi
-    
-    if [ -n "$release_date" ] && [ "$release_date" != "null" ]; then
-        echo "$release_date"
-    else
-        echo "$(get_timestamp)"
+    body=$(curl -sf "${auth[@]}" --connect-timeout 15 --max-time 60 --retry 3 --retry-all-errors "$api_url" 2>/dev/null) || true
+
+    RELEASE_VERSION=$(echo "$body" | grep '"tag_name"' | sed 's/.*"v\?\([^"]*\)".*/\1/' | sed 's/^v//')
+    RELEASE_DATE=$(echo "$body" | grep '"published_at"' | sed 's/.*"published_at": *"\([^"]*\)".*/\1/')
+
+    # Hard-fail when the version cannot be determined. Echoing a placeholder
+    # here committed "Auto-update: Pushpin 1.41.0 -> unknown" on 2026-06-23
+    # and triggered a spurious COPR rebuild pair.
+    if [ -z "$RELEASE_VERSION" ]; then
+        echo "ERROR: could not determine Pushpin version from GitHub API" >&2
+        return 1
     fi
 }
 
@@ -169,10 +160,14 @@ echo
 # Get current versions from file
 read_current_versions
 
-# Get latest version
+# Get latest version. Direct call so RELEASE_VERSION/RELEASE_DATE survive.
 echo "Checking latest Pushpin version..."
-NEW_VERSION=$(get_pushpin_version)
-NEW_RELEASE_DATE=$(get_pushpin_release_date)
+if ! get_release_info; then
+    echo "ERROR: Failed to get latest Pushpin release from GitHub" >&2
+    exit 1
+fi
+NEW_VERSION="$RELEASE_VERSION"
+NEW_RELEASE_DATE="$RELEASE_DATE"
 NEW_DOWNLOAD_URL=$(get_pushpin_download_url "$NEW_VERSION")
 
 echo "Latest Pushpin version: $NEW_VERSION"
@@ -217,7 +212,12 @@ if [ $VERSIONS_CHANGED -eq 1 ]; then
         echo "Run with --update to apply changes"
     fi
     
-    exit 1  # Exit with error code to indicate changes available
+    # update mode: a successful apply is success; exit 1 only signals
+    # "changes available" to check-only callers (manual use)
+    if [ "$MODE" = "update" ] && [ $DRY_RUN -eq 0 ]; then
+        exit 0
+    fi
+    exit 1
 else
     echo "=== No version changes detected ==="
     echo "  Pushpin: $CURRENT_VERSION (unchanged)"
