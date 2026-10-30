@@ -143,34 +143,18 @@ srpm:
 	echo 'NoNewPrivileges=yes'; \
 	echo 'ProtectSystem=strict'; \
 	echo 'ProtectHome=yes'; \
-	echo 'ReadWritePaths=/var/lib/pushpin /var/log/pushpin /var/run/pushpin'; \
+	echo 'ReadWritePaths=/var/lib/pushpin /var/log/pushpin'; \
+	echo '# /run is a fresh tmpfs at boot; systemd creates /run/pushpin (the'; \
+	echo '# compiled-in rundir) for each start, owned by User='; \
+	echo 'RuntimeDirectory=pushpin'; \
 	echo ''; \
 	echo '[Install]'; \
 	echo 'WantedBy=multi-user.target'; \
 	) > pushpin.service || exit 1; \
 	echo "Service file created"; \
 	\
-	echo "=== Creating default configuration file ==="; \
-	( \
-	echo '# Pushpin configuration file'; \
-	echo '# See https://pushpin.org/docs/configuration/ for full documentation'; \
-	echo ''; \
-	echo '# Global settings'; \
-	echo 'include internal.conf'; \
-	echo ''; \
-	echo '# Services to start (comma-separated)'; \
-	echo 'services=connmgr,proxy,handler'; \
-	echo ''; \
-	echo '# HTTP port to listen on'; \
-	echo 'http_port=7999'; \
-	echo ''; \
-	echo '# Local mode (no external dependencies)'; \
-	echo 'global_route_pool_size=1'; \
-	echo ''; \
-	echo '# Default route for all requests (update to your backend)'; \
-	echo '# Example: route=* http://localhost:8080'; \
-	) > pushpin.conf || exit 1; \
-	echo "Default configuration created"; \
+	echo "=== Creating sysusers.d file ==="; \
+	echo 'u pushpin - "Pushpin realtime proxy" /var/lib/pushpin /sbin/nologin' > pushpin.sysusers || exit 1; \
 	\
 	echo "=== Generating RPM spec file ==="; \
 	( \
@@ -186,7 +170,9 @@ srpm:
 	echo "URL:            https://pushpin.org/"; \
 	echo "Source0:        pushpin-%{version}.tar.gz"; \
 	echo "Source1:        pushpin.service"; \
-	echo "Source2:        pushpin.conf"; \
+	echo "# rpm >= 4.19 turns the pushpin-owned files below into Requires:"; \
+	echo "# user(pushpin) and group(pushpin); a sysusers.d file provides them"; \
+	echo "Source3:        pushpin.sysusers"; \
 	echo ''; \
 	echo "BuildRequires:  gcc"; \
 	echo "BuildRequires:  gcc-c++"; \
@@ -223,12 +209,15 @@ srpm:
 	echo "BuildRequires:  pcre2-devel"; \
 	echo "%endif"; \
 	echo "%endif"; \
-	echo "# Qt5 development packages - distribution specific"; \
+	echo "# Qt development packages - distribution specific"; \
+	echo "# Pushpin 1.42.0+ build.rs rejects Qt < 6.0 (check_qmake)"; \
 	echo "%if 0%{?suse_version}"; \
-	echo "# openSUSE/SLES"; \
-	echo "BuildRequires:  libqt5-qtbase-devel"; \
-	echo "BuildRequires:  libQt5Core-devel"; \
-	echo "BuildRequires:  libQt5Network-devel"; \
+	echo "# openSUSE/SLES (qmake6 is in qt6-base-common-devel; build.rs also"; \
+	echo "# runs qmake6 on src/cpptests.pro, which needs Qt testlib)"; \
+	echo "BuildRequires:  qt6-base-common-devel"; \
+	echo "BuildRequires:  qt6-core-devel"; \
+	echo "BuildRequires:  qt6-network-devel"; \
+	echo "BuildRequires:  qt6-test-devel"; \
 	echo "%else"; \
 	echo "%if 0%{?mageia}"; \
 	echo "# Mageia"; \
@@ -243,7 +232,7 @@ srpm:
 	echo "%endif"; \
 	echo "%else"; \
 	echo "# Fedora/RHEL/CentOS/Rocky/Alma"; \
-	echo "BuildRequires:  qt5-qtbase-devel"; \
+	echo "BuildRequires:  qt6-qtbase-devel"; \
 	echo "%endif"; \
 	echo "%endif"; \
 	echo "BuildRequires:  boost-devel"; \
@@ -271,12 +260,22 @@ srpm:
 	echo 'export CARGO_HOME=.cargo'; \
 	echo 'export PREFIX=%{_prefix}'; \
 	echo 'export BINDIR=%{_bindir}'; \
-	echo 'export LIBDIR=%{_libdir}/pushpin'; \
-	echo 'export CONFIGDIR=%{_sysconfdir}/pushpin'; \
+	echo '# build.rs appends /pushpin to LIBDIR and CONFIGDIR (and RUNDIR, LOGDIR)'; \
+	echo 'export LIBDIR=%{_libdir}'; \
+	echo 'export CONFIGDIR=%{_sysconfdir}'; \
 	echo 'export RUST_BACKTRACE=1'; \
 	echo 'export CARGO_PROFILE_RELEASE_BUILD_OVERRIDE_DEBUG=true'; \
 	echo ''; \
 	echo '# Build Pushpin'; \
+	echo '# Cargo.toml pins openssl = "=0.10.72"; that crate and its openssl-sys'; \
+	echo '# 0.9.107 do not build against OpenSSL 4 (Fedora 45). Where OpenSSL 4'; \
+	echo '# is installed, relax the exact pin and take the newest compatible'; \
+	echo '# openssl/openssl-sys (0.10.81/0.9.117 support OpenSSL 4).'; \
+	echo 'if pkg-config --atleast-version=4 openssl; then'; \
+	echo '    sed -i -E '"'"'s/^openssl = "=([0-9.]+)"$$/openssl = "\1"/'"'"' Cargo.toml'; \
+	echo '    cargo update -p openssl -p openssl-sys'; \
+	echo 'fi'; \
+	echo ''; \
 	echo '# Fetch cargo dependencies first (needed when building from tarball)'; \
 	echo 'cargo fetch'; \
 	echo ''; \
@@ -303,7 +302,8 @@ srpm:
 	echo 'ln -sf pushpin-connmgr %{buildroot}%{_bindir}/pushpin-condure'; \
 	echo ''; \
 	echo '# Install configuration files'; \
-	echo 'install -D -m 644 %{SOURCE2} %{buildroot}%{_sysconfdir}/pushpin/pushpin.conf'; \
+	echo '# upstream config with rundir/logdir/configdir filled in by make postbuild'; \
+	echo 'install -D -m 644 postbuild/pushpin.conf.inst %{buildroot}%{_sysconfdir}/pushpin/pushpin.conf'; \
 	echo 'install -D -m 644 src/internal.conf %{buildroot}%{_libdir}/pushpin/internal.conf'; \
 	echo ''; \
 	echo '# Create default routes file'; \
@@ -311,11 +311,11 @@ srpm:
 	echo ''; \
 	echo '# Install systemd service file'; \
 	echo 'install -D -m 644 %{SOURCE1} %{buildroot}%{_unitdir}/pushpin.service'; \
+	echo 'install -D -m 644 %{SOURCE3} %{buildroot}%{_sysusersdir}/pushpin.conf'; \
 	echo ''; \
 	echo '# Create required directories'; \
 	echo 'install -d -m 755 %{buildroot}%{_localstatedir}/lib/pushpin'; \
 	echo 'install -d -m 755 %{buildroot}%{_localstatedir}/log/pushpin'; \
-	echo 'install -d -m 755 %{buildroot}%{_localstatedir}/run/pushpin'; \
 	echo 'install -d -m 755 %{buildroot}%{_sysconfdir}/pushpin/runner'; \
 	echo 'install -d -m 755 %{buildroot}%{_sysconfdir}/pushpin/runner/certs'; \
 	echo ''; \
@@ -362,6 +362,7 @@ srpm:
 	echo '%dir %{_libdir}/pushpin'; \
 	echo '%{_libdir}/pushpin/*'; \
 	echo '%{_unitdir}/pushpin.service'; \
+	echo '%{_sysusersdir}/pushpin.conf'; \
 	echo '%dir %{_sysconfdir}/pushpin'; \
 	echo '%config(noreplace) %{_sysconfdir}/pushpin/pushpin.conf'; \
 	echo '%config(noreplace) %{_sysconfdir}/pushpin/routes'; \
@@ -369,7 +370,6 @@ srpm:
 	echo '%dir %{_sysconfdir}/pushpin/runner/certs'; \
 	echo '%attr(0755,pushpin,pushpin) %dir %{_localstatedir}/lib/pushpin'; \
 	echo '%attr(0755,pushpin,pushpin) %dir %{_localstatedir}/log/pushpin'; \
-	echo '%attr(0755,pushpin,pushpin) %dir %{_localstatedir}/run/pushpin'; \
 	echo ''; \
 	echo '%changelog'; \
 	echo "* $$(date '+%a %b %d %Y') COPR Builder - $$VERSION-$$RELEASE_NUM"; \
@@ -391,7 +391,7 @@ srpm:
 	ls -la $(outdir)/*.src.rpm
 
 clean:
-	@rm -f *.tar.gz *.spec *.src.rpm *.rpm *.service *.conf
+	@rm -f *.tar.gz *.spec *.src.rpm *.rpm *.service *.conf *.sysusers
 	@rm -rf pushpin-*/ .cargo/
 
 .PHONY: srpm clean
